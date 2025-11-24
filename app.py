@@ -5,11 +5,11 @@ and executes them against a SQLite database.
 """
 
 import os
+import re
 import streamlit as st
 from langchain_community.utilities import SQLDatabase
 from langchain_openai import ChatOpenAI
-from langchain.chains import create_sql_query_chain
-from langchain_community.tools.sql_database.tool import QuerySQLDataBaseTool
+from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -64,17 +64,57 @@ def init_llm():
 
 llm = init_llm()
 
-# Create SQL query chain
-@st.cache_resource
-def init_chains(_db, _llm):
-    """Initialize LangChain components"""
-    # Chain to generate SQL query
-    query_chain = create_sql_query_chain(_llm, _db)
-    # Tool to execute SQL query
-    execute_query = QuerySQLDataBaseTool(db=_db)
-    return query_chain, execute_query
+# SQL Query Generation Prompt
+sql_prompt_template = """You are a SQL expert. Given an input question, create a syntactically correct SQLite query to run.
 
-query_chain, execute_query = init_chains(db, llm)
+Use the following database schema:
+
+{schema}
+
+Question: {question}
+
+Instructions:
+- Only use tables and columns that exist in the schema
+- Use SQLite syntax
+- Return ONLY the SQL query, without any explanation or markdown formatting
+- Do not include ```sql or ``` markers
+- The query should be ready to execute
+
+SQL Query:"""
+
+sql_prompt = PromptTemplate(
+    input_variables=["schema", "question"],
+    template=sql_prompt_template
+)
+
+def extract_sql_query(text):
+    """Extract SQL query from LLM response"""
+    # Remove markdown code blocks
+    text = re.sub(r'```sql\s*', '', text)
+    text = re.sub(r'```\s*', '', text)
+    # Remove extra whitespace
+    text = text.strip()
+    return text
+
+def generate_and_execute_query(question):
+    """Generate SQL query and execute it"""
+    try:
+        # Get database schema
+        schema = db.get_table_info()
+        
+        # Generate SQL query
+        formatted_prompt = sql_prompt.format(schema=schema, question=question)
+        response = llm.invoke(formatted_prompt)
+        
+        # Extract SQL query from response
+        sql_query = extract_sql_query(response.content)
+        
+        # Execute query
+        result = db.run(sql_query)
+        
+        return sql_query, result, None
+    except Exception as e:
+        return None, None, str(e)
 
 # Sidebar with database info
 with st.sidebar:
@@ -92,6 +132,7 @@ with st.sidebar:
     - How many transactions were made in the last 30 days?
     - What is the average transaction amount?
     - List the top 5 products by quantity sold
+    - What is the most expensive product?
     """)
     
     st.markdown("---")
@@ -105,7 +146,7 @@ if "messages" not in st.session_state:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if "sql" in message:
+        if "sql" in message and message["sql"]:
             st.code(message["sql"], language="sql")
         if "result" in message:
             st.success("**Result:**")
@@ -122,24 +163,19 @@ if prompt := st.chat_input("Ask a question about your sales data..."):
     
     # Generate and display assistant response
     with st.chat_message("assistant"):
-        with st.spinner("Generating SQL query..."):
-            try:
-                # Generate SQL query
-                sql_query = query_chain.invoke({"question": prompt})
-                
-                # Clean up the SQL query (remove markdown formatting if present)
-                if sql_query.startswith("```sql"):
-                    sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
-                elif sql_query.startswith("```"):
-                    sql_query = sql_query.replace("```", "").strip()
-                
+        with st.spinner("Generating and executing SQL query..."):
+            sql_query, result, error = generate_and_execute_query(prompt)
+            
+            if error:
+                st.error(f"Error: {error}")
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"Error: {error}"
+                })
+            else:
                 # Display the generated SQL
                 st.markdown("**Generated SQL Query:**")
                 st.code(sql_query, language="sql")
-                
-                # Execute the query
-                with st.spinner("Executing query..."):
-                    result = execute_query.invoke(sql_query)
                 
                 # Display the result
                 st.success("**Result:**")
@@ -151,14 +187,6 @@ if prompt := st.chat_input("Ask a question about your sales data..."):
                     "content": "I've generated and executed the SQL query for you:",
                     "sql": sql_query,
                     "result": result
-                })
-                
-            except Exception as e:
-                error_msg = f"Error: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": error_msg
                 })
 
 # Footer
