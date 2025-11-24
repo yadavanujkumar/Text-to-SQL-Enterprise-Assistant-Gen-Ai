@@ -1,3 +1,4 @@
+
 # 🤖 Text-to-SQL Enterprise Assistant
 
 A powerful AI-driven assistant that converts natural language questions into SQL queries and executes them against your database. Built with Streamlit, LangChain, and OpenAI's GPT-3.5-turbo.
@@ -140,4 +141,4 @@ For questions or feedback, please open an issue on GitHub.
 
 ---
 
-**Note**: This is a demonstration project with sample data. For production use, implement proper security measures, authentication, and database access controls.
+**Note**: This is a demonstration project with sample data. For production use, implement proper security measures, authentication, and database access controls
