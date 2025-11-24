@@ -1,1 +1,1 @@
-# -Text-to-SQL-Enterprise-Assistant-GenAI-Data-Eng-
+# Text-to-SQL-Enterprise-Assistant-GenAi
