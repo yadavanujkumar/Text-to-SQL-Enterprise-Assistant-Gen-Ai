@@ -121,23 +121,11 @@ To use a different OpenAI model, edit `app.py`:
 llm = ChatOpenAI(model="gpt-4", temperature=0)  # or gpt-4-turbo, etc.
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- Built with [LangChain](https://langchain.com/)
-- Powered by [OpenAI](https://openai.com/)
-- UI with [Streamlit](https://streamlit.io/)
-
-## 📧 Contact
-
-For questions or feedback, please open an issue on GitHub.
 
 ---
 
